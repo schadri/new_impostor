@@ -237,7 +237,8 @@ function Room() {
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
-    alert('¡Enlace copiado!');
+    setToastMessage('¡Enlace Copiado al Portapapeles!');
+    setTimeout(() => setToastMessage(''), 3000);
   };
 
   const onlinePlayers = players.filter(p => p.isOnline);
