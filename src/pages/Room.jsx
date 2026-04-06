@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Copy, Users, Play, Skull, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getRandomWord } from '../lib/words';
 
 function Room() {
   const { roomId } = useParams();
@@ -154,6 +155,7 @@ function Room() {
 
     // Elegir impostor
     const impostorIndex = Math.floor(Math.random() * players.length);
+    const secretWord = getRandomWord();
     
     // Actualizar todos los jugadores en la DB
     const updates = players.map((p, index) => {
@@ -168,7 +170,7 @@ function Room() {
     // Actualizar estado de sala
     await supabase
       .from('rooms')
-      .update({ status: 'playing' })
+      .update({ status: 'playing', secret_word: secretWord })
       .eq('id', roomId);
   };
 
@@ -261,9 +263,17 @@ function Room() {
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
               {myData.role === 'impostor' ? <Skull size={100} color="var(--impostor)" /> : <ShieldCheck size={100} color="var(--crewmate)" />}
             </div>
-            <p style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.7)' }}>
-              {myData.role === 'impostor' ? 'Engaña a los demás y acaba con ellos.' : 'Descubre al impostor antes de que sea tarde.'}
-            </p>
+            {myData.role !== 'impostor' ? (
+              <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '1.5rem', borderRadius: '12px', marginTop: '1rem', border: '1px solid var(--crewmate)' }}>
+                <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem', opacity: 0.8 }}>La palabra secreta es:</p>
+                <h2 style={{ fontSize: '2.5rem', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase', margin: 0 }}>{room.secret_word}</h2>
+              </div>
+            ) : (
+              <div style={{ background: 'rgba(239, 68, 68, 0.2)', padding: '1.5rem', borderRadius: '12px', marginTop: '1rem', border: '1px solid var(--impostor)' }}>
+                <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem', opacity: 0.8 }}>Tu objetivo:</p>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Finge conocer la palabra averíguala escuchando a los demás.</h2>
+              </div>
+            )}
           </div>
         )}
       </div>
