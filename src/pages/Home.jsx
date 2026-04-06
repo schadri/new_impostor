@@ -68,7 +68,7 @@ function Home() {
               disabled={!joinCode.trim()}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             >
-              <Ghost size={20} />
+              <Ghost size={21} />
               Unirse
             </button>
           </form>
