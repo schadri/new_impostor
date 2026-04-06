@@ -13,6 +13,7 @@ function Room() {
   const [myPlayerId, setMyPlayerId] = useState(null);
   const [playerName, setPlayerName] = useState('');
   const [customWord, setCustomWord] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
   const [hasJoined, setHasJoined] = useState(false);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState(null);
@@ -159,6 +160,8 @@ function Room() {
       .eq('id', roomId);
       
     setCustomWord('');
+    setToastMessage('¡Palabra añadida en secreto!');
+    setTimeout(() => setToastMessage(''), 3000);
   };
 
   const restartGame = async () => {
@@ -307,21 +310,10 @@ function Room() {
             )}
 
             <div style={{ marginTop: '3rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>
-              <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'rgba(255,255,255,0.8)' }}>Palabras de la Casa</h3>
+              <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'rgba(255,255,255,0.8)' }}>Palabras Personalizadas</h3>
               <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)', marginBottom: '1rem' }}>
-                Cualquiera puede añadir palabras. Si salen sorteadas en una partida, se usarán y desaparecerán de la lista.
+                Añade palabras a la bolsa sin que nadie sepa. Actualmente hay <strong>{(room.custom_words || []).length}</strong> palabras secretas mezcladas en la urna.
               </p>
-              
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                {(room.custom_words || []).length === 0 && (
-                  <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Ninguna por ahora...</span>
-                )}
-                {(room.custom_words || []).map((w, i) => (
-                  <span key={i} style={{ background: 'rgba(59, 130, 246, 0.4)', padding: '5px 12px', borderRadius: '15px', fontSize: '0.85rem' }}>
-                    {w}
-                  </span>
-                ))}
-              </div>
 
               <form onSubmit={addCustomWord} style={{ display: 'flex', gap: '0.5rem' }}>
                 <input 
@@ -379,6 +371,17 @@ function Room() {
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
+      
+      {toastMessage && (
+        <div style={{ 
+          position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', 
+          background: 'var(--crewmate)', color: 'white', padding: '10px 20px', 
+          borderRadius: '30px', zIndex: 1000, animation: 'fadeIn 0.3s ease',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)', fontWeight: 'bold'
+        }}>
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }
