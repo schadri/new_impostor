@@ -176,6 +176,8 @@ function Room() {
     alert('¡Enlace copiado!');
   };
 
+  const onlinePlayers = players.filter(p => p.isOnline);
+
   if (loading) return <div className="container" style={{ textAlign: 'center' }}>Cargando...</div>;
 
   if (!hasJoined) {
@@ -199,7 +201,6 @@ function Room() {
     );
   }
 
-  const onlinePlayers = players.filter(p => p.isOnline);
   const amIHost = onlinePlayers.find(p => p.id === myPlayerId)?.is_host;
   const myData = players.find(p => p.id === myPlayerId);
 
