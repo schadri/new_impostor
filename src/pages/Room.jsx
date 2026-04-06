@@ -33,27 +33,29 @@ function Room() {
         navigate('/');
         return;
       }
+      const { data: dbPlayers } = await supabase
+        .from('players')
+        .select('*')
+        .eq('room_id', roomId);
+      
       setRoom(data);
+      if (dbPlayers) setPlayers(dbPlayers.map(p => ({ ...p, isOnline: false })));
       setLoading(false);
 
       // Usar Supabase Realtime Channels para Presence y Cambios
-      roomChannel = supabase.channel(`room:${roomId}`, {
-        config: { presence: { key: roomId } }
-      });
+      roomChannel = supabase.channel(`room:${roomId}`);
 
       // Presence: Estado de quién está conectado
       roomChannel.on('presence', { event: 'sync' }, () => {
         const presenceState = roomChannel.presenceState();
-        const activePlayers = Object.values(presenceState).flat().map(p => p.player_data);
-        // Filtrar duplicados / arreglar el estado
-        setPlayers(current => {
-          // Merge with current state to not lose roles if they exist
-          const merged = activePlayers.map(ap => {
-             const existing = current.find(c => c.id === ap.id);
-             return existing ? { ...existing, ...ap } : ap;
-          });
-          return merged;
-        });
+        const activeIds = Object.values(presenceState).flat().map(p => p.player_id);
+        
+        setPlayers(current => 
+          current.map(p => ({
+             ...p,
+             isOnline: activeIds.includes(p.id)
+          }))
+        );
       });
 
       // Suscribirse a cambios en la tabla rooms
@@ -69,12 +71,13 @@ function Room() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` },
           (payload) => {
-             // Actualizar roles u otros datos provenientes de la db
              setPlayers(current => {
                 const updated = [...current];
                 const index = updated.findIndex(p => p.id === payload.new.id);
                 if (index !== -1) {
                    updated[index] = { ...updated[index], ...payload.new };
+                } else if (payload.eventType === 'INSERT') {
+                   updated.push({ ...payload.new, isOnline: true });
                 }
                 return updated;
              });
@@ -97,19 +100,13 @@ function Room() {
     };
   }, [roomId, navigate]);
 
-  // Enviar el estado online a Presence continuamente cuando se unió
+  // Enviar el estado online a Presence una vez que se une y el canal está listo
   useEffect(() => {
     if (!hasJoined || !myPlayerId || !playerName || !channel) return;
 
     const trackPresence = async () => {
-      const isHost = players.length <= 1;
-      
       await channel.track({
-        player_data: {
-          id: myPlayerId,
-          name: playerName,
-          isHost: isHost
-        }
+        player_id: myPlayerId
       });
     };
 
@@ -121,7 +118,7 @@ function Room() {
     e.preventDefault();
     if (!playerName.trim()) return;
 
-    const isHost = players.length === 0;
+    const isHost = players.filter(p => p.isOnline).length === 0;
 
     const { data: player, error } = await supabase
       .from('players')
@@ -153,12 +150,12 @@ function Room() {
       return;
     }
 
-    // Elegir impostor
-    const impostorIndex = Math.floor(Math.random() * players.length);
+    // Elegir impostor entre los conectados
+    const impostorIndex = Math.floor(Math.random() * onlinePlayers.length);
     const secretWord = getRandomWord();
     
-    // Actualizar todos los jugadores en la DB
-    const updates = players.map((p, index) => {
+    // Actualizar roles solo de conectados
+    const updates = onlinePlayers.map((p, index) => {
        return supabase
          .from('players')
          .update({ role: index === impostorIndex ? 'impostor' : 'crewmate' })
@@ -186,7 +183,7 @@ function Room() {
       <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <div className="card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
           <h2>Unirse a la Sala</h2>
-          <p>Jugadores en sala: {players.length}</p>
+          <p>Jugadores en sala: {onlinePlayers.length}</p>
           <form onSubmit={joinGame} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
             <input 
               type="text" 
@@ -202,7 +199,8 @@ function Room() {
     );
   }
 
-  const amIHost = players.find(p => p.id === myPlayerId)?.isHost;
+  const onlinePlayers = players.filter(p => p.isOnline);
+  const amIHost = onlinePlayers.find(p => p.id === myPlayerId)?.is_host;
   const myData = players.find(p => p.id === myPlayerId);
 
   return (
@@ -218,11 +216,11 @@ function Room() {
         {room.status === 'waiting' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3>Lobby ({players.length}/10)</h3>
+              <h3>Lobby ({onlinePlayers.length}/10)</h3>
             </div>
             
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-              {players.map((p) => (
+              {onlinePlayers.map((p) => (
                 <div key={p.id} style={{ 
                   background: 'rgba(255,255,255,0.05)', 
                   padding: '10px 20px', 
@@ -232,7 +230,7 @@ function Room() {
                   alignItems: 'center',
                   gap: '10px'
                 }}>
-                  <Users size={16} color={p.isHost ? 'var(--accent)' : 'white'} />
+                  <Users size={16} color={p.is_host ? 'var(--accent)' : 'white'} />
                   {p.name} {p.id === myPlayerId ? '(Tú)' : ''}
                 </div>
               ))}
