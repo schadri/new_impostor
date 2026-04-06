@@ -13,6 +13,7 @@ function Room() {
   const [playerName, setPlayerName] = useState('');
   const [hasJoined, setHasJoined] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [channel, setChannel] = useState(null);
 
   // Cargar datos iniciales de la sala y suscribirse a Supabase Presence
   useEffect(() => {
@@ -80,7 +81,11 @@ function Room() {
         )
         .subscribe();
 
-      roomChannel.subscribe();
+      roomChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setChannel(roomChannel);
+        }
+      });
     };
 
     fetchRoom();
@@ -93,27 +98,22 @@ function Room() {
 
   // Enviar el estado online a Presence continuamente cuando se unió
   useEffect(() => {
-    if (!hasJoined || !myPlayerId || !playerName) return;
+    if (!hasJoined || !myPlayerId || !playerName || !channel) return;
 
-    const presenceChannel = supabase.channel(`room:${roomId}`);
-    presenceChannel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        const isHost = players.length === 0; // Primer jugador es host (en memoria por ahora)
-        
-        await presenceChannel.track({
-          player_data: {
-            id: myPlayerId,
-            name: playerName,
-            isHost: isHost
-          }
-        });
-      }
-    });
-
-    return () => {
-      supabase.removeChannel(presenceChannel);
+    const trackPresence = async () => {
+      const isHost = players.length <= 1;
+      
+      await channel.track({
+        player_data: {
+          id: myPlayerId,
+          name: playerName,
+          isHost: isHost
+        }
+      });
     };
-  }, [hasJoined, myPlayerId, playerName, roomId, players.length]);
+
+    trackPresence();
+  }, [hasJoined, myPlayerId, playerName, channel]);
 
 
   const joinGame = async (e) => {
