@@ -141,34 +141,39 @@ function Room() {
   };
 
   const startGame = async () => {
-    // Solo host manda a iniciar
-    const amIHost = players.find(p => p.id === myPlayerId)?.isHost;
-    if (!amIHost) return;
+    try {
+      const amIHost = players.find(p => p.id === myPlayerId)?.is_host;
+      if (!amIHost) return;
 
-    if (players.length < 2) {
-      alert('Se necesitan al menos 2 jugadores');
-      return;
+      if (onlinePlayers.length < 2) {
+        alert('Se necesitan al menos 2 jugadores (abre el link en una ventana de incognito o de celular para simular otro jugador)');
+        return;
+      }
+
+      // Elegir impostor entre los conectados
+      const impostorIndex = Math.floor(Math.random() * onlinePlayers.length);
+      const secretWord = getRandomWord();
+      
+      // Actualizar roles solo de conectados
+      const updates = onlinePlayers.map((p, index) => {
+         return supabase
+           .from('players')
+           .update({ role: index === impostorIndex ? 'impostor' : 'crewmate' })
+           .eq('id', p.id);
+      });
+
+      await Promise.all(updates);
+
+      // Actualizar estado de sala
+      const { error } = await supabase
+        .from('rooms')
+        .update({ status: 'playing', secret_word: secretWord })
+        .eq('id', roomId);
+        
+      if (error) throw error;
+    } catch (err) {
+      alert(`Error al iniciar: ${err.message}. (Si dice 'column secret_word does not exist', significa que olvidaste ejecutar el comando SQL en Supabase)`);
     }
-
-    // Elegir impostor entre los conectados
-    const impostorIndex = Math.floor(Math.random() * onlinePlayers.length);
-    const secretWord = getRandomWord();
-    
-    // Actualizar roles solo de conectados
-    const updates = onlinePlayers.map((p, index) => {
-       return supabase
-         .from('players')
-         .update({ role: index === impostorIndex ? 'impostor' : 'crewmate' })
-         .eq('id', p.id);
-    });
-
-    await Promise.all(updates);
-
-    // Actualizar estado de sala
-    await supabase
-      .from('rooms')
-      .update({ status: 'playing', secret_word: secretWord })
-      .eq('id', roomId);
   };
 
   const copyLink = () => {
