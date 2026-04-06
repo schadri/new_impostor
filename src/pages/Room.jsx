@@ -188,8 +188,10 @@ function Room() {
         return;
       }
 
-      // Elegir impostor entre los conectados
-      const impostorIndex = Math.floor(Math.random() * onlinePlayers.length);
+      // Algoritmo Round Robin para selección de Impostor
+      const minTimes = Math.min(...onlinePlayers.map(p => p.times_impostor || 0));
+      const eligiblePlayers = onlinePlayers.filter(p => (p.times_impostor || 0) === minTimes);
+      const chosenImpostor = eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)];
 
       // Consolidar palabras: Base + Personalizadas
       const currentCustomWords = room.custom_words || [];
@@ -207,10 +209,15 @@ function Room() {
       }
       
       // Actualizar roles solo de conectados
-      const updates = onlinePlayers.map((p, index) => {
+      const updates = onlinePlayers.map((p) => {
+         const isThisImpostor = p.id === chosenImpostor.id;
+         const currentTimes = p.times_impostor || 0;
          return supabase
            .from('players')
-           .update({ role: index === impostorIndex ? 'impostor' : 'crewmate' })
+           .update({ 
+               role: isThisImpostor ? 'impostor' : 'crewmate',
+               times_impostor: isThisImpostor ? currentTimes + 1 : currentTimes
+           })
            .eq('id', p.id);
       });
 
@@ -335,7 +342,7 @@ function Room() {
         {room.status === 'playing' && myData && (
           <div style={{ textAlign: 'center', padding: '3rem 0', animation: 'fadeIn 1s ease' }}>
             <h1 style={{ fontSize: '3rem', marginBottom: '1rem', color: myData.role === 'impostor' ? 'var(--impostor)' : 'var(--crewmate)' }}>
-              ERES {myData.role === 'impostor' ? 'EL IMPOSTOR' : 'TRIPULANTE'}
+              ERES {myData.role === 'impostor' ? 'EL IMPOSTOR' : 'JUGADOR NORMAL'}
             </h1>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
               {myData.role === 'impostor' ? <Skull size={100} color="var(--impostor)" /> : <ShieldCheck size={100} color="var(--crewmate)" />}
@@ -348,7 +355,7 @@ function Room() {
             ) : (
               <div style={{ background: 'rgba(239, 68, 68, 0.2)', padding: '1.5rem', borderRadius: '12px', marginTop: '1rem', border: '1px solid var(--impostor)' }}>
                 <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem', opacity: 0.8 }}>Tu objetivo:</p>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Finge conocer la palabra averíguala escuchando a los demás.</h2>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Escucha a los demás e intenta adivinar la palabra.</h2>
               </div>
             )}
             

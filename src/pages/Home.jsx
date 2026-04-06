@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ghost, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -7,6 +7,26 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Garbage Collector distribuido:
+    // Cada vez que un usuario entra al inicio, limpia silenciosamente 
+    // las salas (y sus jugadores en cascada) creadas hace más de 24 horas.
+    const cleanOldRooms = async () => {
+      try {
+        const yesterday = new Date();
+        yesterday.setHours(yesterday.getHours() - 24);
+        
+        await supabase
+          .from('rooms')
+          .delete()
+          .lt('created_at', yesterday.toISOString());
+      } catch (e) {
+        console.error('GC Error:', e);
+      }
+    };
+    cleanOldRooms();
+  }, []);
 
   const handleCreateRoom = async () => {
     setLoading(true);

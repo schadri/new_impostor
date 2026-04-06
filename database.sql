@@ -15,6 +15,7 @@ create table public.players (
   is_host boolean default false not null,
   role text, -- 'impostor' or 'crewmate'
   is_alive boolean default true not null,
+  times_impostor int default 0 not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
