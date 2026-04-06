@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Copy, Users, Play, Skull, ShieldCheck } from 'lucide-react';
+import { Copy, Users, Play, Skull, ShieldCheck, RotateCcw, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getRandomWord } from '../lib/words';
 
@@ -12,6 +12,7 @@ function Room() {
   const [players, setPlayers] = useState([]);
   const [myPlayerId, setMyPlayerId] = useState(null);
   const [playerName, setPlayerName] = useState('');
+  const [customWord, setCustomWord] = useState('');
   const [hasJoined, setHasJoined] = useState(false);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState(null);
@@ -140,6 +141,40 @@ function Room() {
     setHasJoined(true);
   };
 
+  const addCustomWord = async (e) => {
+    e.preventDefault();
+    if (!customWord.trim()) return;
+    
+    const newWord = customWord.trim().toUpperCase();
+    const currentCustomWords = room.custom_words || [];
+    
+    if (currentCustomWords.includes(newWord)) {
+      setCustomWord('');
+      return;
+    }
+    
+    await supabase
+      .from('rooms')
+      .update({ custom_words: [...currentCustomWords, newWord] })
+      .eq('id', roomId);
+      
+    setCustomWord('');
+  };
+
+  const restartGame = async () => {
+    const amIHost = players.find(p => p.id === myPlayerId)?.is_host;
+    if (!amIHost) return;
+    
+    try {
+      await supabase
+        .from('rooms')
+        .update({ status: 'waiting', secret_word: null })
+        .eq('id', roomId);
+    } catch (err) {
+      alert('Error reiniciando: ' + err.message);
+    }
+  };
+
   const startGame = async () => {
     try {
       const amIHost = players.find(p => p.id === myPlayerId)?.is_host;
@@ -152,7 +187,21 @@ function Room() {
 
       // Elegir impostor entre los conectados
       const impostorIndex = Math.floor(Math.random() * onlinePlayers.length);
-      const secretWord = getRandomWord();
+
+      // Consolidar palabras: Base + Personalizadas
+      const currentCustomWords = room.custom_words || [];
+      const allAvailableWords = [...currentCustomWords, ...currentCustomWords]; // Poniendolas doble le damos más chance si hay pocas
+      
+      // Añadimos una cantidad generosa de palabras base para balancear
+      const baseWordSelection = Array.from({length: 10}, () => getRandomWord());
+      const finalPool = [...allAvailableWords, ...baseWordSelection];
+      
+      const secretWord = finalPool[Math.floor(Math.random() * finalPool.length)];
+      
+      let updatedCustomWords = currentCustomWords;
+      if (currentCustomWords.includes(secretWord)) {
+         updatedCustomWords = currentCustomWords.filter(w => w !== secretWord);
+      }
       
       // Actualizar roles solo de conectados
       const updates = onlinePlayers.map((p, index) => {
@@ -167,7 +216,7 @@ function Room() {
       // Actualizar estado de sala
       const { error } = await supabase
         .from('rooms')
-        .update({ status: 'playing', secret_word: secretWord })
+        .update({ status: 'playing', secret_word: secretWord, custom_words: updatedCustomWords })
         .eq('id', roomId);
         
       if (error) throw error;
@@ -256,6 +305,38 @@ function Room() {
                 Esperando al host para iniciar...
               </p>
             )}
+
+            <div style={{ marginTop: '3rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>
+              <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'rgba(255,255,255,0.8)' }}>Palabras de la Casa</h3>
+              <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)', marginBottom: '1rem' }}>
+                Cualquiera puede añadir palabras. Si salen sorteadas en una partida, se usarán y desaparecerán de la lista.
+              </p>
+              
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                {(room.custom_words || []).length === 0 && (
+                  <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Ninguna por ahora...</span>
+                )}
+                {(room.custom_words || []).map((w, i) => (
+                  <span key={i} style={{ background: 'rgba(59, 130, 246, 0.4)', padding: '5px 12px', borderRadius: '15px', fontSize: '0.85rem' }}>
+                    {w}
+                  </span>
+                ))}
+              </div>
+
+              <form onSubmit={addCustomWord} style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  placeholder="Ej: Silla Eléctrica" 
+                  value={customWord}
+                  onChange={(e) => setCustomWord(e.target.value)}
+                  maxLength={30}
+                  style={{ flex: 1 }}
+                />
+                <button type="submit" className="btn-secondary" disabled={!customWord.trim()} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 1rem' }}>
+                  <Plus size={18} /> Añadir
+                </button>
+              </form>
+            </div>
           </>
         )}
 
@@ -277,6 +358,16 @@ function Room() {
                 <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem', opacity: 0.8 }}>Tu objetivo:</p>
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Finge conocer la palabra averíguala escuchando a los demás.</h2>
               </div>
+            )}
+            
+            {amIHost && (
+              <button 
+                className="btn-secondary" 
+                onClick={restartGame}
+                style={{ marginTop: '3rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+              >
+                <RotateCcw size={18} /> Volver al Lobby
+              </button>
             )}
           </div>
         )}

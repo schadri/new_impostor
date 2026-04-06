@@ -2,6 +2,8 @@
 create table public.rooms (
   id uuid default gen_random_uuid() primary key,
   status text not null default 'waiting' check (status in ('waiting', 'playing', 'finished')),
+  secret_word text,
+  custom_words text[] default '{}',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
